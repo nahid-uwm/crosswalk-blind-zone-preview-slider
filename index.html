@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0f14" />
+<title>Slide Crosswalk</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: rgba(18, 24, 33, 0.72);
+    --panel-border: rgba(255, 255, 255, 0.08);
+    --text: #e6edf3;
+    --muted: #9aa4b2;
+    --accent: #4f9dff;
+    --accent-2: #7ad0ff;
+    --track: rgba(255, 255, 255, 0.14);
+    --thumb-shadow: 0 0 0 6px rgba(79, 157, 255, 0.18);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+      radial-gradient(ellipse at top, rgba(79, 157, 255, 0.08), transparent 60%),
+      radial-gradient(ellipse at bottom, rgba(122, 208, 255, 0.05), transparent 60%),
+      var(--bg);
+    padding: clamp(12px, 2vw, 28px);
+    padding-bottom: clamp(130px, 18vh, 200px);
+    overflow: hidden;
+  }
+
+  .image-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+    pointer-events: none;
+  }
+  .slide.active { opacity: 1; }
+  .slide img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  }
+
+  .loader {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    margin: -22px 0 0 -22px;
+    border: 3px solid rgba(255, 255, 255, 0.15);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+    display: none;
+  }
+  .loader.visible { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 14px clamp(14px, 3vw, 28px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .topbar .title {
+    font-size: clamp(13px, 1.6vw, 15px);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--panel);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--panel-border);
+    padding: 8px 14px;
+    border-radius: 999px;
+    pointer-events: auto;
+  }
+  .topbar .value {
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(14px, 1.8vw, 16px);
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--panel-border);
+    padding: 8px 14px;
+    border-radius: 999px;
+    pointer-events: auto;
+  }
+  .topbar .value .label {
+    color: var(--muted);
+    margin-right: 8px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.8em;
+  }
+  .topbar .value .num { color: var(--accent-2); }
+
+  .cache-status {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 14px;
+    z-index: 5;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--panel);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--panel-border);
+    padding: 6px 12px;
+    border-radius: 999px;
+    pointer-events: none;
+    transition: opacity 400ms ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cache-status.done { opacity: 0; }
+  .cache-status .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  .cache-status.done .dot { background: #3ddc84; animation: none; }
+  @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+  @media (max-width: 520px) {
+    .cache-status { display: none; }
+  }
+
+  .controls {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 14px clamp(14px, 3vw, 28px) max(14px, env(safe-area-inset-bottom));
+    z-index: 10;
+  }
+
+  .panel {
+    background: var(--panel);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--panel-border);
+    border-radius: 18px;
+    padding: 14px 18px 18px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  }
+
+  .scale {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .scale .mid { font-variant-numeric: tabular-nums; }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .btn {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid var(--panel-border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    font-size: 18px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 150ms ease, transform 150ms ease, border-color 150ms ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255,255,255,0.16); }
+  .btn:active { transform: scale(0.94); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1 1 auto;
+    height: 36px;
+    background: transparent;
+    cursor: pointer;
+    touch-action: none;
+    margin: 0;
+  }
+  input[type="range"]:focus { outline: none; }
+
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 6px;
+    background: linear-gradient(to right,
+      var(--accent) 0%,
+      var(--accent) var(--fill, 0%),
+      var(--track) var(--fill, 0%),
+      var(--track) 100%);
+    border-radius: 999px;
+  }
+  input[type="range"]::-moz-range-track {
+    height: 6px;
+    background: var(--track);
+    border-radius: 999px;
+  }
+  input[type="range"]::-moz-range-progress {
+    height: 6px;
+    background: var(--accent);
+    border-radius: 999px;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid var(--accent);
+    margin-top: -8px;
+    box-shadow: var(--thumb-shadow);
+    transition: transform 120ms ease, box-shadow 120ms ease;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid var(--accent);
+    box-shadow: var(--thumb-shadow);
+  }
+  input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.15); }
+  input[type="range"]:active::-moz-range-thumb { transform: scale(1.15); }
+
+  .error {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0,0,0,0.7);
+    z-index: 20;
+  }
+  .error.visible { display: flex; }
+  .error .box {
+    max-width: 460px;
+    background: #1a232f;
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .error code {
+    background: rgba(255,255,255,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+
+  @media (max-width: 520px) {
+    .stage { padding-bottom: clamp(140px, 22vh, 200px); }
+    .topbar { padding: 10px 14px; gap: 8px; }
+    .topbar .title { font-size: 11px; padding: 6px 10px; }
+    .topbar .value { font-size: 13px; padding: 6px 12px; }
+    .panel { padding: 12px 14px 14px; border-radius: 16px; }
+    .btn { width: 38px; height: 38px; font-size: 16px; }
+    .slider-row { gap: 10px; }
+  }
+
+  @media (hover: none) {
+    input[type="range"]::-webkit-slider-thumb { width: 26px; height: 26px; margin-top: -10px; }
+    input[type="range"]::-moz-range-thumb { width: 26px; height: 26px; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="title">Slide Crosswalk</div>
+    <div class="value"><span class="label">Progress</span><span class="num" id="valueLabel">—</span></div>
+  </div>
+  <div class="cache-status" id="cacheStatus"><span class="dot"></span><span id="cacheText">0 / 0</span></div>
+
+  <div class="stage" id="stage">
+    <div class="image-wrap" id="imageWrap"></div>
+    <div class="loader" id="loader"></div>
+  </div>
+
+  <div class="controls">
+    <div class="panel">
+      <div class="scale">
+        <span id="minLabel">—</span>
+        <span class="mid" id="midLabel">—</span>
+        <span id="maxLabel">—</span>
+      </div>
+      <div class="slider-row">
+        <button class="btn" id="prevBtn" aria-label="Previous">‹</button>
+        <input type="range" id="slider" min="0" max="0" step="1" value="0" aria-label="Progress slider" />
+        <button class="btn" id="nextBtn" aria-label="Next">›</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="error" id="errorBox">
+    <div class="box">
+      <strong>Images not loading?</strong><br />
+      This is a static site. If you opened <code>index.html</code> directly,
+      some browsers block loading local images. Serve it with a local web server:
+      <br /><br />
+      <code>python -m http.server</code> — then open <code>http://localhost:8000</code>.
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Filenames in the img/ folder. Number in the name is the progress value.
+  const FILES = [
+    "fixed_map 10.000 Screenshot 2026-04-15 00-34-18-766.jpg",
+    "fixed_map 11.000 Screenshot 2026-04-15 00-36-28-13.jpg",
+    "fixed_map 12.000 Screenshot 2026-04-15 00-38-33-476.jpg",
+    "fixed_map 13.000 Screenshot 2026-04-15 00-40-34-725.jpg",
+    "fixed_map 14.000 Screenshot 2026-04-15 00-42-33-822.jpg",
+    "fixed_map 15.000 Screenshot 2026-04-15 00-44-29-70.jpg",
+    "fixed_map 16.000 Screenshot 2026-04-15 00-46-18-841.jpg",
+    "fixed_map 17.000 Screenshot 2026-04-15 00-48-05-806.jpg",
+    "fixed_map 18.000 Screenshot 2026-04-15 00-49-48-735.jpg",
+    "fixed_map 19.000 Screenshot 2026-04-15 00-51-27-167.jpg",
+    "fixed_map 20.000 Screenshot 2026-04-15 00-53-00-870.jpg",
+    "fixed_map 21.000 Screenshot 2026-04-15 00-54-30-637.jpg",
+    "fixed_map 22.000 Screenshot 2026-04-15 00-55-57-31.jpg",
+    "fixed_map 23.000 Screenshot 2026-04-15 00-57-20-92.jpg",
+    "fixed_map 24.000 Screenshot 2026-04-15 00-58-38-576.jpg",
+    "fixed_map 25.000 Screenshot 2026-04-15 00-59-54-462.jpg",
+    "fixed_map 26.000 Screenshot 2026-04-15 01-01-07-276.jpg",
+    "fixed_map 27.000 Screenshot 2026-04-15 01-02-16-859.jpg",
+    "fixed_map 28.000 Screenshot 2026-04-15 01-03-24-770.jpg",
+    "fixed_map 29.000 Screenshot 2026-04-15 01-04-31-132.jpg",
+    "fixed_map 30.000 Screenshot 2026-04-15 01-05-34-870.jpg",
+    "fixed_map 31.000 Screenshot 2026-04-15 01-06-36-56.jpg",
+    "fixed_map 32.000 Screenshot 2026-04-15 01-07-35-919.jpg",
+    "fixed_map 33.000 Screenshot 2026-04-15 01-08-35-381.jpg",
+    "fixed_map 34.000 Screenshot 2026-04-15 01-09-33-358.jpg",
+    "fixed_map 35.000 Screenshot 2026-04-15 01-10-29-709.jpg",
+    "fixed_map 36.000 Screenshot 2026-04-15 01-11-24-696.jpg",
+    "fixed_map 37.000 Screenshot 2026-04-15 01-12-17-865.jpg",
+    "fixed_map 38.000 Screenshot 2026-04-15 01-13-10-597.jpg",
+    "fixed_map 39.000 Screenshot 2026-04-15 01-14-01-726.jpg",
+    "fixed_map 40.000 Screenshot 2026-04-15 01-14-52-907.jpg",
+    "fixed_map 41.000 Screenshot 2026-04-15 01-15-44-517.jpg",
+    "fixed_map 42.000 Screenshot 2026-04-15 01-16-36-432.jpg",
+    "fixed_map 43.000 Screenshot 2026-04-15 01-17-28-371.jpg",
+    "fixed_map 44.000 Screenshot 2026-04-15 01-18-20-978.jpg",
+    "fixed_map 45.000 Screenshot 2026-04-15 01-19-13-728.jpg",
+    "fixed_map 46.000 Screenshot 2026-04-15 01-20-07-284.jpg",
+    "fixed_map 47.000 Screenshot 2026-04-15 01-21-01-967.jpg",
+    "fixed_map 48.000 Screenshot 2026-04-15 01-21-58-250.jpg",
+    "fixed_map 49.000 Screenshot 2026-04-15 01-22-56-165.jpg",
+    "fixed_map 50.000 Screenshot 2026-04-15 01-23-57-580.jpg",
+    "fixed_map 51.000 Screenshot 2026-04-15 01-25-04-685.jpg",
+    "fixed_map 52.000 Screenshot 2026-04-15 01-26-19-513.jpg",
+    "fixed_map 53.000 Screenshot 2026-04-15 01-27-44-23.jpg",
+    "fixed_map 54.000 Screenshot 2026-04-15 01-29-18-745.jpg",
+    "fixed_map 55.000 Screenshot 2026-04-15 01-31-00-202.jpg",
+    "fixed_map 56.000 Screenshot 2026-04-15 01-32-44-375.jpg",
+    "fixed_map 57.000 Screenshot 2026-04-15 01-34-31-321.jpg",
+    "fixed_map 58.000 Screenshot 2026-04-15 01-36-19-903.jpg",
+    "fixed_map 59.000 Screenshot 2026-04-15 01-38-13-923.jpg",
+    "fixed_map 60.000 Screenshot 2026-04-15 01-40-11-921.jpg",
+    "fixed_map 61.000 Screenshot 2026-04-15 01-42-12-903.jpg",
+    "fixed_map 62.000 Screenshot 2026-04-15 01-44-20-268.jpg",
+    "fixed_map 63.000 Screenshot 2026-04-15 01-46-30-418.jpg",
+    "fixed_map 64.000 Screenshot 2026-04-15 01-48-46-210.jpg",
+    "fixed_map 65.000 Screenshot 2026-04-15 01-51-05-909.jpg",
+    "fixed_map 66.000 Screenshot 2026-04-15 01-53-30-286.jpg",
+    "fixed_map 67.000 Screenshot 2026-04-15 01-55-58-498.jpg",
+    "fixed_map 68.000 Screenshot 2026-04-15 01-58-31-369.jpg",
+    "fixed_map 69.000 Screenshot 2026-04-15 02-01-06-936.jpg",
+    "fixed_map 70.000 Screenshot 2026-04-15 02-03-44-974.jpg",
+    "fixed_map 71.000 Screenshot 2026-04-15 02-06-23-443.jpg",
+    "fixed_map 72.000 Screenshot 2026-04-15 02-08-58-802.jpg",
+    "fixed_map 73.000 Screenshot 2026-04-15 02-11-32-237.jpg",
+    "fixed_map 74.000 Screenshot 2026-04-15 02-14-05-233.jpg",
+    "fixed_map 75.000 Screenshot 2026-04-15 02-16-32-664.jpg",
+    "fixed_map 76.000 Screenshot 2026-04-15 02-18-56-480.jpg",
+    "fixed_map 77.000 Screenshot 2026-04-15 02-21-12-395.jpg",
+    "fixed_map 78.000 Screenshot 2026-04-15 02-23-22-784.jpg",
+    "fixed_map 79.000 Screenshot 2026-04-15 02-25-26-997.jpg",
+    "fixed_map 80.000 Screenshot 2026-04-15 02-27-27-641.jpg",
+    "fixed_map 81.000 Screenshot 2026-04-15 02-29-25-195.jpg",
+    "fixed_map 82.000 Screenshot 2026-04-15 02-31-22-58.jpg",
+    "fixed_map 83.000 Screenshot 2026-04-15 02-33-18-465.jpg",
+    "fixed_map 84.000 Screenshot 2026-04-15 02-35-16-371.jpg",
+    "fixed_map 85.000 Screenshot 2026-04-15 02-37-14-969.jpg",
+    "fixed_map 86.000 Screenshot 2026-04-15 02-39-15-720.jpg",
+    "fixed_map 87.000 Screenshot 2026-04-15 02-41-22-262.jpg",
+    "fixed_map 88.000 Screenshot 2026-04-15 02-43-38-352.jpg",
+    "fixed_map 89.000 Screenshot 2026-04-15 02-46-02-996.jpg",
+    "fixed_map 90.000 Screenshot 2026-04-15 02-48-33-772.jpg",
+    "fixed_map 91.000 Screenshot 2026-04-15 02-51-11-340.jpg",
+    "fixed_map 92.000 Screenshot 2026-04-15 02-53-56-493.jpg",
+    "fixed_map 93.000 Screenshot 2026-04-15 02-56-46-991.jpg",
+    "fixed_map 94.000 Screenshot 2026-04-15 02-59-40-811.jpg",
+    "fixed_map 95.000 Screenshot 2026-04-15 03-02-40-242.jpg",
+    "fixed_map 96.000 Screenshot 2026-04-15 03-05-43-67.jpg",
+    "fixed_map 97.000 Screenshot 2026-04-15 03-08-44-787.jpg",
+    "fixed_map 98.000 Screenshot 2026-04-15 03-11-48-820.jpg",
+    "fixed_map 99.000 Screenshot 2026-04-15 03-14-52-720.jpg"
+  ];
+
+  // Parse the numeric progress value out of each filename, sort ascending.
+  const slides = FILES
+    .map((name) => {
+      const match = name.match(/(\d+(?:\.\d+)?)/);
+      return match ? { value: parseFloat(match[1]), file: name } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.value - b.value);
+
+  const imageWrap = document.getElementById("imageWrap");
+  const slider = document.getElementById("slider");
+  const valueLabel = document.getElementById("valueLabel");
+  const minLabel = document.getElementById("minLabel");
+  const midLabel = document.getElementById("midLabel");
+  const maxLabel = document.getElementById("maxLabel");
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  const loader = document.getElementById("loader");
+  const errorBox = document.getElementById("errorBox");
+  const cacheStatus = document.getElementById("cacheStatus");
+  const cacheText = document.getElementById("cacheText");
+
+  if (slides.length === 0) {
+    errorBox.classList.add("visible");
+    return;
+  }
+
+  slider.min = 0;
+  slider.max = slides.length - 1;
+  slider.value = 0;
+
+  minLabel.textContent = formatValue(slides[0].value);
+  maxLabel.textContent = formatValue(slides[slides.length - 1].value);
+  midLabel.textContent = formatValue(slides[Math.floor(slides.length / 2)].value);
+
+  const slideEls = slides.map((s) => {
+    const el = document.createElement("div");
+    el.className = "slide";
+    const img = document.createElement("img");
+    img.alt = "Slide " + formatValue(s.value);
+    img.decoding = "async";
+    img.draggable = false;
+    img.dataset.src = "img/" + s.file;
+    el.appendChild(img);
+    imageWrap.appendChild(el);
+    return { el, img, loaded: false, loading: false, failed: false };
+  });
+
+  let currentIndex = -1;
+  let errorCount = 0;
+  let loadedCount = 0;
+  const MAX_CONCURRENT = 4;
+  let inFlight = 0;
+  const idleCB = window.requestIdleCallback || ((cb) => setTimeout(() => cb({ timeRemaining: () => 15, didTimeout: false }), 1));
+
+  function formatValue(v) {
+    return Number.isInteger(v) ? String(v) : v.toFixed(3).replace(/\.?0+$/, "");
+  }
+
+  function updateCacheStatus() {
+    cacheText.textContent = loadedCount + " / " + slides.length;
+    if (loadedCount >= slides.length) cacheStatus.classList.add("done");
+  }
+  updateCacheStatus();
+
+  // Load one image. Returns a Promise that resolves when the <img> is loaded AND decoded.
+  function loadSlide(i, priority) {
+    const s = slideEls[i];
+    if (s.loaded || s.loading || s.failed) return Promise.resolve();
+    s.loading = true;
+    if (priority && "fetchPriority" in HTMLImageElement.prototype) {
+      s.img.fetchPriority = "high";
+    }
+    s.img.src = s.img.dataset.src;
+    return new Promise((resolve) => {
+      const done = () => { s.loading = false; resolve(); };
+      s.img.addEventListener("load", () => {
+        s.loaded = true;
+        loadedCount++;
+        updateCacheStatus();
+        // Decode off the main thread so first paint of this slide is instant.
+        (s.img.decode ? s.img.decode().catch(() => {}) : Promise.resolve()).then(done);
+      }, { once: true });
+      s.img.addEventListener("error", () => {
+        s.failed = true;
+        errorCount++;
+        if (errorCount >= 3 && location.protocol === "file:") {
+          errorBox.classList.add("visible");
+        }
+        done();
+      }, { once: true });
+    });
+  }
+
+  // Background prefetcher: visits every slide, always picking the one nearest
+  // the current index that hasn't been loaded yet. Re-prioritizes automatically
+  // when the user moves the slider (because it recomputes nearest each tick).
+  function pickNextIndex() {
+    let best = -1;
+    let bestDist = Infinity;
+    for (let i = 0; i < slideEls.length; i++) {
+      const s = slideEls[i];
+      if (s.loaded || s.loading || s.failed) continue;
+      const d = Math.abs(i - currentIndex);
+      if (d < bestDist) { bestDist = d; best = i; }
+    }
+    return best;
+  }
+
+  function pumpPrefetch() {
+    while (inFlight < MAX_CONCURRENT) {
+      const next = pickNextIndex();
+      if (next === -1) return;
+      inFlight++;
+      loadSlide(next, false).then(() => {
+        inFlight--;
+        idleCB(pumpPrefetch, { timeout: 500 });
+      });
+    }
+  }
+
+  function setIndex(i) {
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    if (i === currentIndex) return;
+
+    // The current slide and its immediate neighbors are high priority — don't wait for idle.
+    loadSlide(i, true);
+    if (i > 0) loadSlide(i - 1, true);
+    if (i < slides.length - 1) loadSlide(i + 1, true);
+
+    if (currentIndex >= 0) slideEls[currentIndex].el.classList.remove("active");
+    slideEls[i].el.classList.add("active");
+
+    currentIndex = i;
+    valueLabel.textContent = formatValue(slides[i].value);
+
+    const pct = slides.length > 1 ? (i / (slides.length - 1)) * 100 : 0;
+    slider.style.setProperty("--fill", pct + "%");
+
+    if (String(slider.value) !== String(i)) slider.value = i;
+
+    loader.classList.toggle("visible", !slideEls[i].loaded);
+    if (!slideEls[i].loaded) {
+      slideEls[i].img.addEventListener("load", () => {
+        if (currentIndex === i) loader.classList.remove("visible");
+      }, { once: true });
+    }
+
+    // Kick the background prefetcher — it'll reprioritize around the new index.
+    idleCB(pumpPrefetch, { timeout: 500 });
+  }
+
+  slider.addEventListener("input", () => setIndex(parseInt(slider.value, 10)));
+  prevBtn.addEventListener("click", () => setIndex(currentIndex - 1));
+  nextBtn.addEventListener("click", () => setIndex(currentIndex + 1));
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { setIndex(currentIndex - 1); e.preventDefault(); }
+    else if (e.key === "ArrowRight") { setIndex(currentIndex + 1); e.preventDefault(); }
+    else if (e.key === "Home") { setIndex(0); e.preventDefault(); }
+    else if (e.key === "End") { setIndex(slides.length - 1); e.preventDefault(); }
+  });
+
+  // Swipe on the stage for mobile.
+  const stage = document.getElementById("stage");
+  let touchStartX = null;
+  stage.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 1) touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  stage.addEventListener("touchend", (e) => {
+    if (touchStartX === null) return;
+    const dx = (e.changedTouches[0].clientX) - touchStartX;
+    if (Math.abs(dx) > 40) setIndex(currentIndex + (dx < 0 ? 1 : -1));
+    touchStartX = null;
+  }, { passive: true });
+
+  setIndex(0);
+  // Start warming the cache in the background as soon as the page is idle.
+  idleCB(pumpPrefetch, { timeout: 1000 });
+})();
+</script>
+</body>
+</html>
