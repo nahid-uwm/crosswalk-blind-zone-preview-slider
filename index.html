@@ -604,7 +604,7 @@
   </div>
   <div class="cache-status" id="cacheStatus"><span class="dot"></span><span id="cacheText">0 / 0</span></div>
 
-  <div class="stats-panel" id="statsPanel">
+  <div class="stats-panel hidden" id="statsPanel">
     <div class="stat-card" id="statRoad">
       <div class="title">Road</div>
       <div class="stat-row"><span class="label">Visible</span><span class="val stat-val-visible">—</span></div>
@@ -636,6 +636,7 @@
       </div>
       <div class="slider-row">
         <button class="btn" id="prevBtn" aria-label="Previous">‹</button>
+        <button class="btn" id="playBtn" aria-label="Play">▶</button>
         <input type="range" id="slider" min="0" max="0" step="1" value="0" aria-label="Progress slider" />
         <button class="btn" id="nextBtn" aria-label="Next">›</button>
       </div>
@@ -829,6 +830,7 @@
       const maxLabel = document.getElementById("maxLabel");
       const prevBtn = document.getElementById("prevBtn");
       const nextBtn = document.getElementById("nextBtn");
+      const playBtn = document.getElementById("playBtn");
       const loader = document.getElementById("loader");
       const errorBox = document.getElementById("errorBox");
       const cacheStatus = document.getElementById("cacheStatus");
@@ -854,7 +856,6 @@
         }
       }
       toggleStatsBtn.addEventListener("click", toggleStats);
-      toggleStats(); // initialize appropriately
 
       if (slides.length === 0) {
         errorBox.classList.add("visible");
@@ -988,8 +989,33 @@
       }
 
       slider.addEventListener("input", () => setIndex(parseInt(slider.value, 10)));
-      prevBtn.addEventListener("click", () => setIndex(currentIndex - 1));
-      nextBtn.addEventListener("click", () => setIndex(currentIndex + 1));
+      prevBtn.addEventListener("click", () => { stopPlay(); setIndex(currentIndex - 1); });
+      nextBtn.addEventListener("click", () => { stopPlay(); setIndex(currentIndex + 1); });
+
+      let playTimer = null;
+      const FRAME_MS = 100; // 10 fps
+      function startPlay() {
+        if (playTimer) return;
+        playBtn.textContent = "❚❚";
+        playBtn.setAttribute("aria-label", "Pause");
+        playTimer = setInterval(() => {
+          if (currentIndex >= slides.length - 1) { stopPlay(); return; }
+          setIndex(currentIndex + 1);
+        }, FRAME_MS);
+      }
+      function stopPlay() {
+        if (!playTimer) return;
+        clearInterval(playTimer);
+        playTimer = null;
+        playBtn.textContent = "▶";
+        playBtn.setAttribute("aria-label", "Play");
+      }
+      playBtn.addEventListener("click", () => {
+        if (playTimer) { stopPlay(); return; }
+        if (currentIndex >= slides.length - 1) setIndex(0);
+        startPlay();
+      });
+      slider.addEventListener("pointerdown", stopPlay);
 
       document.addEventListener("keydown", (e) => {
         if (e.key === "ArrowLeft") { setIndex(currentIndex - 1); e.preventDefault(); }
