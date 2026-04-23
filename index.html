@@ -39,8 +39,8 @@
       position: fixed;
       inset: 0;
       display: flex;
-      align-items: center;
-      justify-content: center;
+      flex-direction: row;
+      gap: 20px;
       background:
         radial-gradient(ellipse at top, rgba(79, 157, 255, 0.08), transparent 60%),
         radial-gradient(ellipse at bottom, rgba(122, 208, 255, 0.05), transparent 60%),
@@ -63,13 +63,76 @@
       }
     }
 
-    .image-wrap {
+    .left-panel {
+      flex: 2;
       position: relative;
-      width: 100%;
+      height: 100%;
+    }
+
+    .right-panel {
+      flex: 1;
       height: 100%;
       display: flex;
-      align-items: center;
-      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-section {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+
+    .legend-img {
+      flex: 0 0 30%;
+      max-height: 30%;
+      width: 100%;
+      object-fit: contain;
+      object-position: left center;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+
+    .desc-wrap {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+
+    .description-text {
+      font-size: 18px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .mobile-toggle {
+      display: none;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+
+    .driver-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    .image-wrap {
+      position: absolute;
+      inset: 0;
     }
 
     .slide {
@@ -87,15 +150,81 @@
     }
 
     .slide img {
-      max-width: 100%;
-      max-height: 100%;
-      width: auto;
-      height: auto;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
       user-select: none;
       -webkit-user-drag: none;
       border-radius: 10px;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+    }
+
+    @media (max-width: 800px) {
+      .stage {
+        flex-direction: column;
+        gap: 12px;
+        overflow-y: auto;
+      }
+      .left-panel {
+        flex: 0 0 auto;
+        width: 100%;
+        height: auto;
+      }
+      .left-panel .image-wrap {
+        position: static;
+        display: flex;
+      }
+      .left-panel .slide {
+        display: none;
+        position: static;
+      }
+      .left-panel .slide.active {
+        display: flex;
+        position: relative;
+        width: 100%;
+        height: auto;
+      }
+      .left-panel .slide img {
+        height: auto;
+      }
+      
+      .right-panel {
+        flex: 1 1 auto;
+        min-height: 300px;
+        gap: 8px;
+      }
+      .info-section {
+        flex: unset;
+        max-height: none;
+        padding: 10px;
+      }
+      .legend-img {
+        flex: 0 0 auto;
+        max-height: 80px;
+      }
+      .mobile-toggle {
+        display: block;
+      }
+      .description-text {
+        font-size: 14px;
+      }
+
+      .right-panel.show-driver .desc-wrap {
+        display: none;
+      }
+      .right-panel.show-driver .driver-wrap {
+        display: block;
+        flex: 1 1 auto;
+        min-height: 150px;
+      }
+      
+      .right-panel.show-desc .driver-wrap {
+        display: none;
+      }
+      .right-panel.show-desc .desc-wrap {
+        display: block;
+        flex: 1 1 auto;
+      }
     }
 
     .loader {
@@ -623,7 +752,19 @@
   </div>
 
   <div class="stage" id="stage">
-    <div class="image-wrap" id="imageWrap"></div>
+    <div class="left-panel">
+      <div class="image-wrap" id="fixedMapWrap"></div>
+    </div>
+    <div class="right-panel show-driver" id="rightPanel">
+      <div class="info-section">
+        <img src="image folder/legend/legend.png" class="legend-img" alt="Legend">
+        <button id="mobileViewToggle" class="mobile-toggle">View Description</button>
+        <div class="desc-wrap">
+          <p class="description-text">This is a demonstration of a use-case that we have been applying our new (in development) simulation tool towards. We are interested in determining the blindzones of a vehicle, as they relate to a crosswalk, as the vehicle completes a left-hand turn at a four-way intersection. To accomplish this, our tool divides the 3D space above the crosswalk into many 10cmx10cmx10cm "voxels". At each point along the vehicle path (notated with the progress metric), each voxel is determined to be visible or in a blindzone of the vehicle. We do this for three zones: 1) at 0.0m or the road level, 2) between 0.1m and 0.9m or child height, and between 1.0m and 1.7m or adult height. The images show a top-down view, where you can see if the top voxel in each zone is in a blindzone; if it is, it is colored according to the legend. You can use the slider or press the play button to progress through the vehicle's trajectory.</p>
+        </div>
+      </div>
+      <div class="driver-wrap" id="driverWrap"></div>
+    </div>
     <div class="loader" id="loader"></div>
   </div>
 
@@ -654,102 +795,40 @@
   </div>
 
   <script>
-    (function () {
+    (async function () {
       "use strict";
 
-      // Filenames in the img/ folder. Number in the name is the progress value.
-      const FILES = [
-        "fixed_map 10.000 Screenshot 2026-04-15 00-34-18-766.jpg",
-        "fixed_map 11.000 Screenshot 2026-04-15 00-36-28-13.jpg",
-        "fixed_map 12.000 Screenshot 2026-04-15 00-38-33-476.jpg",
-        "fixed_map 13.000 Screenshot 2026-04-15 00-40-34-725.jpg",
-        "fixed_map 14.000 Screenshot 2026-04-15 00-42-33-822.jpg",
-        "fixed_map 15.000 Screenshot 2026-04-15 00-44-29-70.jpg",
-        "fixed_map 16.000 Screenshot 2026-04-15 00-46-18-841.jpg",
-        "fixed_map 17.000 Screenshot 2026-04-15 00-48-05-806.jpg",
-        "fixed_map 18.000 Screenshot 2026-04-15 00-49-48-735.jpg",
-        "fixed_map 19.000 Screenshot 2026-04-15 00-51-27-167.jpg",
-        "fixed_map 20.000 Screenshot 2026-04-15 00-53-00-870.jpg",
-        "fixed_map 21.000 Screenshot 2026-04-15 00-54-30-637.jpg",
-        "fixed_map 22.000 Screenshot 2026-04-15 00-55-57-31.jpg",
-        "fixed_map 23.000 Screenshot 2026-04-15 00-57-20-92.jpg",
-        "fixed_map 24.000 Screenshot 2026-04-15 00-58-38-576.jpg",
-        "fixed_map 25.000 Screenshot 2026-04-15 00-59-54-462.jpg",
-        "fixed_map 26.000 Screenshot 2026-04-15 01-01-07-276.jpg",
-        "fixed_map 27.000 Screenshot 2026-04-15 01-02-16-859.jpg",
-        "fixed_map 28.000 Screenshot 2026-04-15 01-03-24-770.jpg",
-        "fixed_map 29.000 Screenshot 2026-04-15 01-04-31-132.jpg",
-        "fixed_map 30.000 Screenshot 2026-04-15 01-05-34-870.jpg",
-        "fixed_map 31.000 Screenshot 2026-04-15 01-06-36-56.jpg",
-        "fixed_map 32.000 Screenshot 2026-04-15 01-07-35-919.jpg",
-        "fixed_map 33.000 Screenshot 2026-04-15 01-08-35-381.jpg",
-        "fixed_map 34.000 Screenshot 2026-04-15 01-09-33-358.jpg",
-        "fixed_map 35.000 Screenshot 2026-04-15 01-10-29-709.jpg",
-        "fixed_map 36.000 Screenshot 2026-04-15 01-11-24-696.jpg",
-        "fixed_map 37.000 Screenshot 2026-04-15 01-12-17-865.jpg",
-        "fixed_map 38.000 Screenshot 2026-04-15 01-13-10-597.jpg",
-        "fixed_map 39.000 Screenshot 2026-04-15 01-14-01-726.jpg",
-        "fixed_map 40.000 Screenshot 2026-04-15 01-14-52-907.jpg",
-        "fixed_map 41.000 Screenshot 2026-04-15 01-15-44-517.jpg",
-        "fixed_map 42.000 Screenshot 2026-04-15 01-16-36-432.jpg",
-        "fixed_map 43.000 Screenshot 2026-04-15 01-17-28-371.jpg",
-        "fixed_map 44.000 Screenshot 2026-04-15 01-18-20-978.jpg",
-        "fixed_map 45.000 Screenshot 2026-04-15 01-19-13-728.jpg",
-        "fixed_map 46.000 Screenshot 2026-04-15 01-20-07-284.jpg",
-        "fixed_map 47.000 Screenshot 2026-04-15 01-21-01-967.jpg",
-        "fixed_map 48.000 Screenshot 2026-04-15 01-21-58-250.jpg",
-        "fixed_map 49.000 Screenshot 2026-04-15 01-22-56-165.jpg",
-        "fixed_map 50.000 Screenshot 2026-04-15 01-23-57-580.jpg",
-        "fixed_map 51.000 Screenshot 2026-04-15 01-25-04-685.jpg",
-        "fixed_map 52.000 Screenshot 2026-04-15 01-26-19-513.jpg",
-        "fixed_map 53.000 Screenshot 2026-04-15 01-27-44-23.jpg",
-        "fixed_map 54.000 Screenshot 2026-04-15 01-29-18-745.jpg",
-        "fixed_map 55.000 Screenshot 2026-04-15 01-31-00-202.jpg",
-        "fixed_map 56.000 Screenshot 2026-04-15 01-32-44-375.jpg",
-        "fixed_map 57.000 Screenshot 2026-04-15 01-34-31-321.jpg",
-        "fixed_map 58.000 Screenshot 2026-04-15 01-36-19-903.jpg",
-        "fixed_map 59.000 Screenshot 2026-04-15 01-38-13-923.jpg",
-        "fixed_map 60.000 Screenshot 2026-04-15 01-40-11-921.jpg",
-        "fixed_map 61.000 Screenshot 2026-04-15 01-42-12-903.jpg",
-        "fixed_map 62.000 Screenshot 2026-04-15 01-44-20-268.jpg",
-        "fixed_map 63.000 Screenshot 2026-04-15 01-46-30-418.jpg",
-        "fixed_map 64.000 Screenshot 2026-04-15 01-48-46-210.jpg",
-        "fixed_map 65.000 Screenshot 2026-04-15 01-51-05-909.jpg",
-        "fixed_map 66.000 Screenshot 2026-04-15 01-53-30-286.jpg",
-        "fixed_map 67.000 Screenshot 2026-04-15 01-55-58-498.jpg",
-        "fixed_map 68.000 Screenshot 2026-04-15 01-58-31-369.jpg",
-        "fixed_map 69.000 Screenshot 2026-04-15 02-01-06-936.jpg",
-        "fixed_map 70.000 Screenshot 2026-04-15 02-03-44-974.jpg",
-        "fixed_map 71.000 Screenshot 2026-04-15 02-06-23-443.jpg",
-        "fixed_map 72.000 Screenshot 2026-04-15 02-08-58-802.jpg",
-        "fixed_map 73.000 Screenshot 2026-04-15 02-11-32-237.jpg",
-        "fixed_map 74.000 Screenshot 2026-04-15 02-14-05-233.jpg",
-        "fixed_map 75.000 Screenshot 2026-04-15 02-16-32-664.jpg",
-        "fixed_map 76.000 Screenshot 2026-04-15 02-18-56-480.jpg",
-        "fixed_map 77.000 Screenshot 2026-04-15 02-21-12-395.jpg",
-        "fixed_map 78.000 Screenshot 2026-04-15 02-23-22-784.jpg",
-        "fixed_map 79.000 Screenshot 2026-04-15 02-25-26-997.jpg",
-        "fixed_map 80.000 Screenshot 2026-04-15 02-27-27-641.jpg",
-        "fixed_map 81.000 Screenshot 2026-04-15 02-29-25-195.jpg",
-        "fixed_map 82.000 Screenshot 2026-04-15 02-31-22-58.jpg",
-        "fixed_map 83.000 Screenshot 2026-04-15 02-33-18-465.jpg",
-        "fixed_map 84.000 Screenshot 2026-04-15 02-35-16-371.jpg",
-        "fixed_map 85.000 Screenshot 2026-04-15 02-37-14-969.jpg",
-        "fixed_map 86.000 Screenshot 2026-04-15 02-39-15-720.jpg",
-        "fixed_map 87.000 Screenshot 2026-04-15 02-41-22-262.jpg",
-        "fixed_map 88.000 Screenshot 2026-04-15 02-43-38-352.jpg",
-        "fixed_map 89.000 Screenshot 2026-04-15 02-46-02-996.jpg",
-        "fixed_map 90.000 Screenshot 2026-04-15 02-48-33-772.jpg",
-        "fixed_map 91.000 Screenshot 2026-04-15 02-51-11-340.jpg",
-        "fixed_map 92.000 Screenshot 2026-04-15 02-53-56-493.jpg",
-        "fixed_map 93.000 Screenshot 2026-04-15 02-56-46-991.jpg",
-        "fixed_map 94.000 Screenshot 2026-04-15 02-59-40-811.jpg",
-        "fixed_map 95.000 Screenshot 2026-04-15 03-02-40-242.jpg",
-        "fixed_map 96.000 Screenshot 2026-04-15 03-05-43-67.jpg",
-        "fixed_map 97.000 Screenshot 2026-04-15 03-08-44-787.jpg",
-        "fixed_map 98.000 Screenshot 2026-04-15 03-11-48-820.jpg",
-        "fixed_map 99.000 Screenshot 2026-04-15 03-14-52-720.jpg"
-      ];
+      // Source folder for fixed map images. Change this constant to load images from a different folder.
+      const FIXED_MAP_DIR = "image folder/compressed new image/";
+      const DRIVER_VIEW_DIR = "image folder/new image 3 layer driver view/";
+      let FILES = [];
+      let DRIVER_FILES = [];
+
+      async function fetchImagesConfig(dir) {
+        try {
+          const response = await fetch(dir);
+          if (response.ok) {
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+            return Array.from(doc.querySelectorAll('a'))
+              .map(a => a.getAttribute('href'))
+              .filter(href => href && href.match(/\.(png|jpg|jpeg)$/i))
+              .map(href => decodeURIComponent(href.split('/').pop()));
+          }
+        } catch (err) {
+          console.error("Could not auto-fetch from " + dir, err);
+        }
+        return [];
+      }
+
+      FILES = await fetchImagesConfig(FIXED_MAP_DIR);
+      DRIVER_FILES = await fetchImagesConfig(DRIVER_VIEW_DIR);
+
+      const driverSlides = DRIVER_FILES.map(name => {
+        const m = name.match(/(\d+(?:\.\d+)?)/);
+        return m ? { value: parseFloat(m[1]), file: name } : null;
+      }).filter(Boolean);
 
       // Parse the numeric progress value out of each filename, sort ascending.
       const slides = FILES
@@ -759,6 +838,12 @@
         })
         .filter(Boolean)
         .sort((a, b) => a.value - b.value);
+
+      // Match driver images to fixed map slides
+      slides.forEach(s => {
+        const match = driverSlides.find(ds => ds.value === s.value);
+        if (match) s.driverFile = match.file;
+      });
 
       const csvData = { road: {}, adult: {}, child: {} };
 
@@ -822,7 +907,26 @@
         updateStatsCard('statChild', csvData.child, pInt);
       }
 
-      const imageWrap = document.getElementById("imageWrap");
+      const fixedMapWrap = document.getElementById("fixedMapWrap");
+      const driverWrap = document.getElementById("driverWrap");
+      const rightPanel = document.getElementById("rightPanel");
+      const mobileViewToggle = document.getElementById("mobileViewToggle");
+
+      if (mobileViewToggle && rightPanel) {
+        let showingDriver = true;
+        mobileViewToggle.addEventListener("click", () => {
+          showingDriver = !showingDriver;
+          if (showingDriver) {
+            rightPanel.classList.remove("show-desc");
+            rightPanel.classList.add("show-driver");
+            mobileViewToggle.textContent = "View Description";
+          } else {
+            rightPanel.classList.remove("show-driver");
+            rightPanel.classList.add("show-desc");
+            mobileViewToggle.textContent = "View Driver Maps";
+          }
+        });
+      }
       const slider = document.getElementById("slider");
       const valueLabel = document.getElementById("valueLabel");
       const minLabel = document.getElementById("minLabel");
@@ -871,16 +975,34 @@
       midLabel.textContent = formatValue(slides[Math.floor(slides.length / 2)].value);
 
       const slideEls = slides.map((s) => {
-        const el = document.createElement("div");
-        el.className = "slide";
+        // Fixed Map DOM handling
+        const elFixed = document.createElement("div");
+        elFixed.className = "slide";
         const img = document.createElement("img");
-        img.alt = "Slide " + formatValue(s.value);
+        img.alt = "Fixed Map " + formatValue(s.value);
         img.decoding = "async";
         img.draggable = false;
-        img.dataset.src = "img_compressed/" + s.file;
-        el.appendChild(img);
-        imageWrap.appendChild(el);
-        return { el, img, loaded: false, loading: false, failed: false };
+        img.dataset.src = FIXED_MAP_DIR + s.file;
+        elFixed.appendChild(img);
+        fixedMapWrap.appendChild(elFixed);
+
+        let elDriver = null;
+        let driverImg = null;
+        
+        // Driver view DOM handling
+        if (s.driverFile) {
+          elDriver = document.createElement("div");
+          elDriver.className = "slide";
+          driverImg = document.createElement("img");
+          driverImg.alt = "Driver " + formatValue(s.value);
+          driverImg.decoding = "async";
+          driverImg.draggable = false;
+          driverImg.dataset.src = DRIVER_VIEW_DIR + s.driverFile;
+          elDriver.appendChild(driverImg);
+          driverWrap.appendChild(elDriver);
+        }
+
+        return { elFixed, elDriver, img, driverImg, loaded: false, loading: false, failed: false };
       });
 
       let currentIndex = -1;
@@ -900,32 +1022,42 @@
       }
       updateCacheStatus();
 
-      // Load one image. Returns a Promise that resolves when the <img> is loaded AND decoded.
+      // Load one image. Returns a Promise that resolves when the components are loaded AND decoded.
       function loadSlide(i, priority) {
         const s = slideEls[i];
         if (s.loaded || s.loading || s.failed) return Promise.resolve();
         s.loading = true;
-        if (priority && "fetchPriority" in HTMLImageElement.prototype) {
-          s.img.fetchPriority = "high";
-        }
-        s.img.src = s.img.dataset.src;
-        return new Promise((resolve) => {
-          const done = () => { s.loading = false; resolve(); };
-          s.img.addEventListener("load", () => {
+
+        const loadSingleImg = (imgEl) => {
+          if (!imgEl) return Promise.resolve(true); // true means success
+          if (priority && "fetchPriority" in HTMLImageElement.prototype) {
+            imgEl.fetchPriority = "high";
+          }
+          imgEl.src = imgEl.dataset.src;
+          return new Promise((res) => {
+            imgEl.addEventListener("load", () => {
+              (imgEl.decode ? imgEl.decode().catch(() => {}) : Promise.resolve()).then(() => res(true));
+            }, { once: true });
+            imgEl.addEventListener("error", () => res(false), { once: true });
+          });
+        };
+
+        return Promise.all([
+          loadSingleImg(s.img),
+          loadSingleImg(s.driverImg)
+        ]).then(([mainOk, driverOk]) => {
+          s.loading = false;
+          if (mainOk) {
             s.loaded = true;
             loadedCount++;
             updateCacheStatus();
-            // Decode off the main thread so first paint of this slide is instant.
-            (s.img.decode ? s.img.decode().catch(() => { }) : Promise.resolve()).then(done);
-          }, { once: true });
-          s.img.addEventListener("error", () => {
+          } else {
             s.failed = true;
             errorCount++;
             if (errorCount >= 3 && location.protocol === "file:") {
               errorBox.classList.add("visible");
             }
-            done();
-          }, { once: true });
+          }
         });
       }
 
@@ -965,8 +1097,13 @@
         if (i > 0) loadSlide(i - 1, true);
         if (i < slides.length - 1) loadSlide(i + 1, true);
 
-        if (currentIndex >= 0) slideEls[currentIndex].el.classList.remove("active");
-        slideEls[i].el.classList.add("active");
+        if (currentIndex >= 0 && slideEls[currentIndex]) {
+          if (slideEls[currentIndex].elFixed) slideEls[currentIndex].elFixed.classList.remove("active");
+          if (slideEls[currentIndex].elDriver) slideEls[currentIndex].elDriver.classList.remove("active");
+        }
+        
+        if (slideEls[i].elFixed) slideEls[i].elFixed.classList.add("active");
+        if (slideEls[i].elDriver) slideEls[i].elDriver.classList.add("active");
 
         currentIndex = i;
         valueLabel.textContent = formatValue(slides[i].value);

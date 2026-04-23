@@ -35,8 +35,8 @@ def compress_images(input_dir, output_dir, max_width=1000):
 
 if __name__ == "__main__":
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    input_folder = os.path.join(current_dir, "img")
-    output_folder = os.path.join(current_dir, "img_compressed")
+    input_folder = os.path.join(current_dir, "image folder", "new image main")
+    output_folder = os.path.join(current_dir, "image folder", "compressed new image")
     
     print(f"Reading from: {input_folder}")
     print(f"Saving to: {output_folder}")
