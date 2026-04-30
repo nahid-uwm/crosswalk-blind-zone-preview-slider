@@ -1,5 +1,10 @@
 import os
+import re
 from PIL import Image
+
+# Configuration directories - change these to easily update source and output paths
+SOURCE_FOLDER = r"d:\Research Work\GITHUB\2026\crosswalk-blind-zone-preview-slider\image folder\april new color\fixed map"
+OUTPUT_FOLDER = r"d:\Research Work\GITHUB\2026\crosswalk-blind-zone-preview-slider\image folder\main fixed map images"
 
 def compress_images(input_dir, output_dir, max_width=1000):
     if not os.path.exists(output_dir):
@@ -22,9 +27,15 @@ def compress_images(input_dir, output_dir, max_width=1000):
                     if img.mode in ("RGBA", "P"):
                         img = img.convert("RGB")
                     
-                    # Ensure it is saved as jpg since index.html expects .jpg
-                    filename_without_ext = os.path.splitext(filename)[0]
-                    output_filename = filename_without_ext + ".jpg"
+                    # Extract progress value to use as the new filename
+                    match = re.search(r'\d+\.\d+', filename)
+                    if match:
+                        output_filename = f"{match.group(0)}.jpg"
+                    else:
+                        # Fallback if no progress value found
+                        filename_without_ext = os.path.splitext(filename)[0]
+                        output_filename = f"{filename_without_ext}.jpg"
+                        
                     output_path = os.path.join(output_dir, output_filename)
                     
                     # Optimize and save
@@ -34,11 +45,7 @@ def compress_images(input_dir, output_dir, max_width=1000):
                 print(f"Error processing {filename}: {e}")
 
 if __name__ == "__main__":
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    input_folder = os.path.join(current_dir, "image folder", "new image main")
-    output_folder = os.path.join(current_dir, "image folder", "compressed new image")
-    
-    print(f"Reading from: {input_folder}")
-    print(f"Saving to: {output_folder}")
-    compress_images(input_folder, output_folder, max_width=1000)
+    print(f"Reading from: {SOURCE_FOLDER}")
+    print(f"Saving to: {OUTPUT_FOLDER}")
+    compress_images(SOURCE_FOLDER, OUTPUT_FOLDER, max_width=1000)
     print("Optimization complete!")
